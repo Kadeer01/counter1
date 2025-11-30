@@ -1,88 +1,243 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Counter DApp</title>
-    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
-
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        button { padding: 10px 20px; margin: 10px; cursor: pointer; }
-        #status { margin-top: 15px; color: green; }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Counter DApp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Ethers.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6fb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      max-width: 420px;
+      width: 100%;
+    }
+    h1 {
+      margin-top: 0;
+      text-align: center;
+    }
+    .row {
+      margin-bottom: 10px;
+      font-size: 14px;
+      word-break: break-all;
+    }
+    .label {
+      font-weight: bold;
+    }
+    .count {
+      font-size: 40px;
+      text-align: center;
+      margin: 20px 0;
+    }
+    button {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 4px;
+    }
+    #connectButton {
+      background: #4a6cf7;
+      color: white;
+      width: 100%;
+    }
+    .btn-secondary {
+      background: #e4e7f2;
+      color: #333;
+    }
+    .btn-primary {
+      background: #4a6cf7;
+      color: #fff;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #555;
+      min-height: 18px;
+    }
+  </style>
 </head>
 <body>
+  <div class="card">
+    <h1>Counter DApp</h1>
 
-    <h2>Simple Counter DApp</h2>
+    <button id="connectButton">Connect MetaMask</button>
 
-    <!-- Connect Button -->
-    <button id="connectButton" onclick="connectWallet()">Connect MetaMask</button>
+    <div class="row">
+      <span class="label">Account:</span>
+      <span id="account">Not connected</span>
+    </div>
 
-    <p id="status">Wallet not connected</p>
+    <div class="row">
+      <span class="label">Network:</span>
+      <span id="network">-</span>
+    </div>
 
-    <hr>
+    <div class="count">
+      Count: <span id="countValue">?</span>
+    </div>
 
-    <p>Current Count: <span id="count">?</span></p>
+    <div style="text-align:center;">
+      <button id="incrementButton" class="btn-primary" disabled>Increment</button>
+      <button id="decrementButton" class="btn-secondary" disabled>Decrement</button>
+    </div>
 
-    <button onclick="increment()">Increment</button>
-    <button onclick="decrement()">Decrement</button>
+    <div class="status" id="status"></div>
+  </div>
 
-    <script>
-        // ABI of your Counter contract
-        const abi = [
-            "function count() public view returns (uint)",
-            "function increment() public",
-            "function decrement() public"
-        ];
+  <script>
+    // -------------------------------
+    //  KONTRAT BİLGİLERİNİ BURAYA GİR
+    // -------------------------------
+    const CONTRACT_ADDRESS = "0x1ECD550A7FDB2C5d6820C40E8B54B38b5Fe46282"; // örn: 0x1234...
 
-        // Replace this with YOUR contract address after deployment
-        const contractAddress = "0x1ECD550A7FDB2C5d6820C40E8B54B38b5Fe46282";
+    // Counter.sol ABI (sadece kullandığımız fonksiyonlar)
+    const CONTRACT_ABI = [
+      {
+        "inputs": [],
+        "name": "count",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "increment",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "decrement",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ];
 
-        let provider;
-        let signer;
-        let contract;
+    let provider;
+    let signer;
+    let contract;
 
-        async function connectWallet() {
-            if (typeof window.ethereum === "undefined") {
-                alert("MetaMask is not installed!");
-                return;
-            }
+    const connectButton = document.getElementById("connectButton");
+    const incrementButton = document.getElementById("incrementButton");
+    const decrementButton = document.getElementById("decrementButton");
+    const accountSpan = document.getElementById("account");
+    const networkSpan = document.getElementById("network");
+    const countValueSpan = document.getElementById("countValue");
+    const statusDiv = document.getElementById("status");
 
-            // Request account access
-            await window.ethereum.request({ method: "eth_requestAccounts" });
-
-            provider = new ethers.providers.Web3Provider(window.ethereum);
-            signer = provider.getSigner();
-            contract = new ethers.Contract(contractAddress, abi, signer);
-
-            document.getElementById("status").innerText = "Wallet connected ✔️";
-
-            loadCount();
+    async function connectWallet() {
+      try {
+        if (!window.ethereum) {
+          alert("MetaMask bulunamadı. Lütfen MetaMask eklentisini kur.");
+          return;
         }
 
-        async function loadCount() {
-            try {
-                const value = await contract.count();
-                document.getElementById("count").innerText = value.toString();
-            } catch (error) {
-                console.log("Connect wallet first.");
-            }
-        }
+        // Hesap iste
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts"
+        });
+        const account = accounts[0];
+        accountSpan.textContent = account;
 
-        async function increment() {
-            if (!contract) return alert("Connect to MetaMask first!");
-            const tx = await contract.increment();
-            await tx.wait();
-            loadCount();
-        }
+        // Provider & signer oluştur
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
 
-        async function decrement() {
-            if (!contract) return alert("Connect to MetaMask first!");
-            const tx = await contract.decrement();
-            await tx.wait();
-            loadCount();
-        }
-    </script>
+        // Ağ bilgisini göster
+        const network = await provider.getNetwork();
+        networkSpan.textContent = network.name + " (chainId: " + network.chainId + ")";
 
+        // Kontrat instance
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+        // İlk count değerini çek
+        await updateCount();
+
+        // Butonları aktif et
+        incrementButton.disabled = false;
+        decrementButton.disabled = false;
+        setStatus("Connected. Ready to interact with the contract.");
+      } catch (error) {
+        console.error(error);
+        setStatus("Connection failed. See console.");
+      }
+    }
+
+    async function updateCount() {
+      if (!contract) return;
+      try {
+        const value = await contract.count();
+        // BigNumber -> string
+        countValueSpan.textContent = value.toString();
+      } catch (error) {
+        console.error(error);
+        setStatus("Failed to read count. See console.");
+      }
+    }
+
+    async function increment() {
+      if (!contract) return;
+      try {
+        setStatus("Sending increment transaction...");
+        const tx = await contract.increment();
+        await tx.wait();
+        setStatus("Increment transaction confirmed.");
+        await updateCount();
+      } catch (error) {
+        console.error(error);
+        setStatus("Increment failed. See console.");
+      }
+    }
+
+    async function decrement() {
+      if (!contract) return;
+      try {
+        setStatus("Sending decrement transaction...");
+        const tx = await contract.decrement();
+        await tx.wait();
+        setStatus("Decrement transaction confirmed.");
+        await updateCount();
+      } catch (error) {
+        console.error(error);
+        setStatus("Decrement failed. See console. (Belki count = 0?)");
+      }
+    }
+
+    function setStatus(msg) {
+      statusDiv.textContent = msg;
+    }
+
+    // Event listeners
+    connectButton.addEventListener("click", connectWallet);
+    incrementButton.addEventListener("click", increment);
+    decrementButton.addEventListener("click", decrement);
+
+    // Hesap veya ağ değişince otomatik güncelle
+    if (window.ethereum) {
+      window.ethereum.on("accountsChanged", () => {
+        window.location.reload();
+      });
+      window.ethereum.on("chainChanged", () => {
+        window.location.reload();
+      });
+    }
+  </script>
 </body>
 </html>
