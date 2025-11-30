@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Counter DApp</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; cursor: pointer; }
+        #status { margin-top: 15px; color: green; }
+    </style>
+</head>
+<body>
+
+    <h2>Simple Counter DApp</h2>
+
+    <!-- Connect Button -->
+    <button id="connectButton" onclick="connectWallet()">Connect MetaMask</button>
+
+    <p id="status">Wallet not connected</p>
+
+    <hr>
+
+    <p>Current Count: <span id="count">?</span></p>
+
+    <button onclick="increment()">Increment</button>
+    <button onclick="decrement()">Decrement</button>
+
+    <script>
+        // ABI of your Counter contract
+        const abi = [
+            "function count() public view returns (uint)",
+            "function increment() public",
+            "function decrement() public"
+        ];
+
+        // Replace this with YOUR contract address after deployment
+        const contractAddress = "0x1ECD550A7FDB2C5d6820C40E8B54B38b5Fe46282";
+
+        let provider;
+        let signer;
+        let contract;
+
+        async function connectWallet() {
+            if (typeof window.ethereum === "undefined") {
+                alert("MetaMask is not installed!");
+                return;
+            }
+
+            // Request account access
+            await window.ethereum.request({ method: "eth_requestAccounts" });
+
+            provider = new ethers.providers.Web3Provider(window.ethereum);
+            signer = provider.getSigner();
+            contract = new ethers.Contract(contractAddress, abi, signer);
+
+            document.getElementById("status").innerText = "Wallet connected ✔️";
+
+            loadCount();
+        }
+
+        async function loadCount() {
+            try {
+                const value = await contract.count();
+                document.getElementById("count").innerText = value.toString();
+            } catch (error) {
+                console.log("Connect wallet first.");
+            }
+        }
+
+        async function increment() {
+            if (!contract) return alert("Connect to MetaMask first!");
+            const tx = await contract.increment();
+            await tx.wait();
+            loadCount();
+        }
+
+        async function decrement() {
+            if (!contract) return alert("Connect to MetaMask first!");
+            const tx = await contract.decrement();
+            await tx.wait();
+            loadCount();
+        }
+    </script>
+
+</body>
+</html>
